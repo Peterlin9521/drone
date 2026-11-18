@@ -1,3 +1,4 @@
+import os
 # dronefly.py -- Phase III: LLM decides whether to land.
 # Run ONLY in the 20' cage with the RC in your hand.
 #
@@ -37,7 +38,7 @@ RED    = _mk("31")
 BLUE   = _mk("94")
 
 TEAM = "B1"                      # <-- YOUR TEAM: A1..A10, B1..B10, ... F1..F10
-API_KEY = "REMOVED"   # <-- YOUR KEY
+API_KEY = os.environ["PORTKEY_API_KEY"]   # <-- YOUR KEY
 LOGFILE = "dronefly_log.txt"
 
 # Connect through mavlink-router's TCP port. This leaves the router running, so

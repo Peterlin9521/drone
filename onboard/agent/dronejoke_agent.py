@@ -7,7 +7,7 @@ from portkey_ai import Portkey
 # Put your key in an environment variable (recommended):
 #   export PORTKEY_API_KEY="your-key"
 # or paste it below. Never upload a file with a real key to Canvas/GitHub.
-API_KEY = os.environ.get("PORTKEY_API_KEY", "REMOVED")
+API_KEY = os.environ["PORTKEY_API_KEY"]
 MODEL = "@zotgpt-api-azure/gpt-5.5"
  
 if API_KEY.startswith("PUT-YOUR"):

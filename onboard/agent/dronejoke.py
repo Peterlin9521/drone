@@ -2,7 +2,7 @@ import os
 from portkey_ai import Portkey
 
 portkey = Portkey(
-  api_key = os.environ["LLM_API_KEY"]
+  api_key = os.environ["PORTKEY_API_KEY"]
 )
 
 response = portkey.chat.completions.create(

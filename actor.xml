@@ -1,0 +1,22 @@
+ <actor name="walker">
+      <skin>
+        <filename>https://fuel.gazebosim.org/1.0/Mingfei/models/actor/tip/files/meshes/walk.dae</filename>
+        <scale>1.0</scale>
+      </skin>
+      <animation name="walk">
+        <filename>https://fuel.gazebosim.org/1.0/Mingfei/models/actor/tip/files/meshes/walk.dae</filename>
+        <interpolate_x>true</interpolate_x>
+      </animation>
+      <script>
+        <loop>true</loop>
+        <delay_start>0</delay_start>
+        <auto_start>true</auto_start>
+        <trajectory id="0" type="walk" tension="0.6">
+          <waypoint><time>0</time><pose>-6 8 1.0 0 0 0</pose></waypoint>
+          <waypoint><time>12</time><pose>6 8 1.0 0 0 0</pose></waypoint>
+          <waypoint><time>13</time><pose>6 8 1.0 0 0 3.14</pose></waypoint>
+          <waypoint><time>25</time><pose>-6 8 1.0 0 0 3.14</pose></waypoint>
+          <waypoint><time>26</time><pose>-6 8 1.0 0 0 0</pose></waypoint>
+        </trajectory>
+      </script>
+    </actor>

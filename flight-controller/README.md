@@ -9,5 +9,7 @@
 ## Optical flow + rangefinder (MicoAir MTF-01)
 - MTF-01 speaks MSP (`MSP2_SENSOR_OPTIC_FLOW`, `MSP2_SENSOR_RANGEFINDER`), not MAVLink
 - `FLOW_TYPE` = MSP and the rangefinder set to MSP; **reboot the FC** after setting `FLOW_TYPE`
-- All 4 broken-out UARTs are used, so the companion computer (Orange Pi) talks to the FC
-  on its UART2 via mavlink-router (see `onboard/config/pi_config.txt`)
+- Wired directly to a flight-controller UART (`SERIAL3_PROTOCOL = 32`, MSP). That UART was
+  freed by removing the ESP32-C3 telemetry module.
+- The Orange Pi talks to the FC on another UART (MAVLink) through its own UART2, and
+  mavlink-router shares that link over TCP port 5678 (see `onboard/config/pi_config.txt`)

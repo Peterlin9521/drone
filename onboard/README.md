@@ -26,7 +26,7 @@ Build: `gcc -O2 -shared -fPIC npu_lib.c -o libnpu.so -lVIPhal -lNBGlinker`
 ## `agent/` - LLM in the loop
 | Script | What it does |
 |---|---|
-| `dronefly.py` | The LLM decides whether the drone keeps flying or lands; the decision is validated in Python before any MAVLink command is sent |
+| `dronefly.py` | Reads live battery voltage over MAVLink (SYS_STATUS) and asks the LLM to answer LAND or HOLD with no threshold given; the reply is parsed and validated in Python before a LAND command is sent. The prompt was characterised by measuring the voltage at which the model lands 50% of the time (~3.75 V/cell) |
 | `dronejoke_agent.py` | Two-step LLM pipeline (generate, then yes/no judgement) with the answer checked in code |
 | `dronejoke.py` | Minimal LLM API call |
 

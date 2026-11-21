@@ -6,6 +6,7 @@ from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from geometry_msgs.msg import PoseStamped, TwistStamped
 from mavros_msgs.msg import State, PositionTarget
+from nav_msgs.msg import Odometry
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from mpc_core import FollowMPC
 
@@ -48,7 +49,11 @@ class MPCFollow(Node):
         self.log_path = os.path.expanduser('~/sim/logs/mpc_%s_%s.csv' % ('side' if self.side else 'dist', time.strftime('%H%M%S')))
         self.log = open(self.log_path, 'w'); self.log.write('t,px,py,yaw,tx,ty,tvx,tvy,ux,uy,dist,ms\n')
         q = qos_profile_sensor_data
-        self.create_subscription(PoseStamped, '/walker/pose', self.on_walker, 10)
+        self.tgt_topic, self.tgt_timeout = P('target_topic', '/walker/pose'), P('target_timeout', 1.0)
+        if self.tgt_topic.endswith('odom'):                       # 直接用估計器的速度,不做差分
+            self.create_subscription(Odometry, self.tgt_topic, self.on_odom, 10)
+        else:
+            self.create_subscription(PoseStamped, self.tgt_topic, self.on_walker, 10)
         self.create_subscription(PoseStamped, '/mavros/local_position/pose', self.on_pose, q)
         self.create_subscription(TwistStamped, '/mavros/local_position/velocity_local', self.on_vel, q)
         self.create_subscription(State, '/mavros/state', lambda m: setattr(self, 'state', m), 10)
@@ -56,6 +61,7 @@ class MPCFollow(Node):
         self.create_timer(0.05, self.step)
         self.get_logger().info('%s  %s  距離 %.1f m(最小 %.1f m)  log=%s' % (
             'LIVE' if self.live else 'DRY-RUN', ('跟隨角度 %.0f°' % self.angle) if self.side else '只保持距離MPC', self.d, self.d_min, self.log_path))
+        self.get_logger().info('目標來源: %s' % self.tgt_topic)
 
     def on_pose(self, m):
         self.p = np.array([m.pose.position.x, m.pose.position.y]); self.z = m.pose.position.z
@@ -63,6 +69,9 @@ class MPCFollow(Node):
         self.yaw = math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z))
     def on_vel(self, m):
         self.v = np.array([m.twist.linear.x, m.twist.linear.y])
+    def on_odom(self, m):
+        self.tgt = np.array([m.pose.pose.position.x, m.pose.pose.position.y])
+        self.tv = np.array([m.twist.twist.linear.x, m.twist.twist.linear.y]); self.tgt_t = time.time()
     def on_walker(self, m):
         now = time.time()
         z = np.array([m.pose.position.x, m.pose.position.y]) + self.noise * self.rng.standard_normal(2)
@@ -72,6 +81,13 @@ class MPCFollow(Node):
 
     def step(self):
         if self.p is None or self.yaw is None or self.tgt is None: return
+        if time.time() - self.tgt_t > self.tgt_timeout:                  # 目標太久沒更新:原地懸停
+            self.u = np.zeros(2)
+            if self.live and self.state.mode == 'GUIDED' and self.state.armed:
+                m = PositionTarget(); m.header.stamp = self.get_clock().now().to_msg()
+                m.coordinate_frame = PositionTarget.FRAME_LOCAL_NED; m.type_mask = 0b0000011111000111
+                m.velocity.z = float(clip(1.0 * (self.alt - self.z), 1.0)); self.pub.publish(m)
+            return
         t0 = time.perf_counter()
         nr = self.ref(self.p, self.tgt, self.tv, 0.05) if self.side else None
         u, _, _ = self.mpc.solve(self.p, self.v, self.u, self.tgt, self.tv, self.d, self.d_min, nr)

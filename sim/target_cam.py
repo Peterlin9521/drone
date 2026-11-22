@@ -51,6 +51,7 @@ class TargetCam(Node):
         self.create_subscription(PoseStamped, '/mavros/local_position/pose', self.on_pose, qos_profile_sensor_data)
         self.create_subscription(PoseStamped, '/walker/pose', lambda m: setattr(self, 'truth', (m.pose.position.x, m.pose.position.y)), 10)
         self.pub = self.create_publisher(PoseStamped, '/target/pose', 10)
+        self.pub_meas = self.create_publisher(PoseStamped, '/target/meas', 10)   # 原始量測
         self.pub_odom = self.create_publisher(Odometry, '/target/odom', 10)
         self.pub_img = self.create_publisher(Image, '/perception/image', 1)
         self.n_frames = self.n_upd = 0; self.errs = []
@@ -96,6 +97,10 @@ class TargetCam(Node):
             sel = min(cand, key=lambda c: abs((c[1][0] + c[1][2]) / 2 - w / 2))
             self.kf = KF(sel[0])
         upd = sel is not None
+        if upd:
+            mm = PoseStamped(); mm.header.stamp = msg.header.stamp; mm.header.frame_id = 'map'
+            mm.pose.position.x, mm.pose.position.y = float(sel[0][0]), float(sel[0][1]); mm.pose.orientation.w = 1.0
+            self.pub_meas.publish(mm)
         if upd:
             rng = np.linalg.norm(sel[0] - p[:2])
             self.kf.update(sel[0], self.sigma0 + 0.008 * rng * rng); self.last_upd = now; self.n_upd += 1

@@ -5,7 +5,20 @@ on my own with an onboard NPU for real-time detection, optical-flow positioning,
 simulation stack for developing autonomy (MPC follow-me) before flight tests. The longer-term goal
 is to bring the perception and autonomy of large autonomous drones down to a small, low-cost airframe.
 
-<!-- Add a photo of the drone here, e.g. ![Drone](docs/drone.jpg) -->
+<p align="center">
+  <img src="docs/drone.jpg" width="320" alt="The drone: Orange Pi Zero 3W on top, USB camera at the front, GPS mast">
+  &nbsp;
+  <img src="docs/field_test.jpg" width="320" alt="Field test day at UC Irvine">
+</p>
+
+## Demos
+**Flight test with onboard NPU detection**
+
+<!-- Drag docs/flight_test_npu.mp4 here in the GitHub web editor -->
+
+**follow_track dry run**
+
+<!-- Drag docs/follow_track_dryrun.mp4 here in the GitHub web editor -->
 
 ## Hardware
 | Part | Details |

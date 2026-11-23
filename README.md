@@ -14,11 +14,19 @@ is to bring the perception and autonomy of large autonomous drones down to a sma
 ## Demos
 **Flight test with onboard NPU detection**
 
-<!-- Drag docs/flight_test_npu.mp4 here in the GitHub web editor -->
+
+
+https://github.com/user-attachments/assets/b305bdeb-7360-40c8-a73c-a2e7d0981e52
+
+
 
 **follow_track dry run**
 
-<!-- Drag docs/follow_track_dryrun.mp4 here in the GitHub web editor -->
+
+
+https://github.com/user-attachments/assets/b9b99de0-3bd2-470d-8b97-984f997ece33
+
+
 
 ## Hardware
 | Part | Details |

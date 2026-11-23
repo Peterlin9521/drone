@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: GPL-2.0
+# Out-of-tree build of Allwinner VIN sensor drivers (A733 / sun60iw2).
+# setup.sh copies this file into <linux-orangepi>/bsp/drivers/vin/modules/sensor/
+
+# Reference build: the vendor IMX219 driver (sanity check of the toolchain)
+obj-m := imx219.o
+
+# Our driver, built once the source exists
+ifneq ($(wildcard $(src)/ov9281_mipi.c),)
+obj-m += ov9281_mipi.o
+endif
+
+# Allwinner vendor headers (sunxi-log.h, sunxi-clk.h, sunxi-gpio.h, ...)
+# sensor/ -> modules/ -> vin/ -> drivers/ -> bsp/  =>  bsp/include
+ccflags-y += -I$(src)/../../../../include

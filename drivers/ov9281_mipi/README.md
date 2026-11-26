@@ -8,9 +8,11 @@ driver, so this folder ports one into Allwinner's VIN camera framework.
 - [x] Vendor camera stack confirmed working (VIN loads, both CSI ports probe)
 - [x] On-board driver build environment (headers + vendor source + Kbuild)
 - [x] Rebuilt the vendor IMX219 driver out-of-tree and loaded it successfully
-- [ ] `ov9281_mipi.c`: read chip ID 0x9281 over I2C
-- [ ] First frame (Y10, 1280x800)
-- [ ] Device-tree overlay for sensor0 / sensor1
+- [x] `ov9281_mipi.c` v0.1 written (chip-ID detect + 1280x800 RAW10 @ ~60 fps)
+- [x] Device-tree user overlay generator for sensor0 (`overlay/make_overlay.sh`)
+- [ ] Read chip ID 0x9281 on hardware
+- [ ] First frame (mono RAW10, 1280x800)
+- [ ] sensor1 / CAM2
 - [ ] Two cameras streaming, hardware-synchronised (FSIN)
 
 ## Platform
@@ -39,7 +41,29 @@ driver, so this folder ports one into Allwinner's VIN camera framework.
   (e.g. `sunxi-log.h`), which the headers package does not include. The
   `Kbuild` here adds that include path and builds only the drivers we need.
 
-## Build (on the board)
+## Bring-up steps (on the board)
+```bash
+./setup.sh                    # build imx219.ko (reference) + ov9281_mipi.ko
+./overlay/make_overlay.sh     # sensor0 -> ov9281_mipi, addr 0xc0, ISP bypass
+sudo reboot
+./test.sh                     # reload VIN with the driver, print dmesg
+```
+Success looks like `[ov9281] found OV9281, chip id 0x9281`.
+
+Grab frames (pick the VIN capture node from `v4l2-ctl --list-devices`):
+```bash
+v4l2-ctl -d /dev/videoN --set-fmt-video=width=1280,height=800,pixelformat=BG10 \
+  --stream-mmap --stream-count=5 --stream-to=frames.raw
+python3 raw2png.py frames.raw
+```
+
+### Driver notes
+- VIN has no Y10 media-bus path, so the mono RAW10 stream is reported as
+  `SBGGR10_1X10`; the bytes are plain grey values.
+- One mode: 1280x800, 2 lanes @ 800 Mbps, HTS 1456, VTS 1822, ~60 fps.
+- Exposure/gain use VIN's Q4 convention (16 = 1 line / 1.0x).
+
+## Build only (on the board)
 ```bash
 ./setup.sh                 # headers, sparse vendor source, build
 sudo rmmod vin_v4l2        # VIN only probes sensors when it loads

@@ -19,7 +19,8 @@ bypassed, contrast-stretched. The blurred hand is motion blur during the
 - [x] Device-tree user overlay for sensor0 (`overlay/make_overlay.sh`)
 - [x] Chip ID 0x9281 read on hardware (CAM1)
 - [x] First frames captured (mono RAW10, 1280x800)
-- [ ] Exposure / gain control from user space
+- [x] Tools: `capture.sh` (auto-finds /dev/videoN) + contrast-stretched PNG
+- [ ] Exposure / gain control from user space (next: `v4l2-ctl -d /dev/video0 -l`)
 - [ ] sensor1 / CAM2
 - [ ] Two cameras streaming, hardware-synchronised (external trigger)
 
@@ -36,6 +37,8 @@ bypassed, contrast-stretched. The blurred hand is motion blur during the
 
 ## Quick start (on the board)
 ```bash
+source ~/drone-env/bin/activate   # Python venv (see "Python environment")
+pip install -r requirements.txt   # numpy + pillow for raw2png.py
 ./setup.sh                    # build imx219.ko (reference) + ov9281_mipi.ko
 ./overlay/make_overlay.sh     # sensor0 -> ov9281_mipi, addr 0xc0, ISP bypass
 sudo reboot
@@ -82,6 +85,22 @@ v4l2-ctl -d /dev/video0 -i 0 \
   --stream-mmap --stream-skip=10 --stream-count=5 --stream-to=frames.raw
 python3 raw2png.py frames.raw
 ```
+
+## Python environment
+`raw2png.py` (and the later VIO tools) run inside the existing **drone-env**
+venv. The venv is separate from this repo: the repo lives in `~/drone`, the
+venv in `~/drone-env` (outside git). Only the dependency list is tracked:
+
+| File | Purpose |
+|---|---|
+| `requirements.txt` | Python packages the camera tools need (`numpy`, `pillow`) |
+
+```bash
+source ~/drone-env/bin/activate
+pip install -r requirements.txt
+```
+The kernel module and shell scripts need no Python. `v4l2-ctl` comes from the
+system package `v4l-utils`.
 
 ## Driver notes
 - VIN has no Y10 media-bus path, so the mono RAW10 stream is reported as

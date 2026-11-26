@@ -7,3 +7,7 @@ build/
 .*.cmd
 Module.symvers
 modules.order
+*.raw
+/frames*.png
+/shot*.png
+/frame_bright.png

@@ -2,18 +2,26 @@
 
 Goal: run two OV9281 mono global-shutter cameras on the Zero 3W's two MIPI CSI
 ports as a stereo pair for onboard VIO/SLAM. The vendor BSP ships no OV9281
-driver, so this folder ports one into Allwinner's VIN camera framework.
+driver (officially only IMX219 is supported), so this folder ports one into
+Allwinner's VIN camera framework.
+
+![First frame from the OV9281 on the Zero 3W](docs/first_frame.png)
+
+*First frame (2026-11-26): 1280x800 mono RAW10 through MIPI CSI -> VIN, ISP
+bypassed, contrast-stretched. The blurred hand is motion blur during the
+~5.8 ms exposure; there is no rolling-shutter skew.*
 
 ## Status
 - [x] Vendor camera stack confirmed working (VIN loads, both CSI ports probe)
 - [x] On-board driver build environment (headers + vendor source + Kbuild)
 - [x] Rebuilt the vendor IMX219 driver out-of-tree and loaded it successfully
-- [x] `ov9281_mipi.c` v0.1 written (chip-ID detect + 1280x800 RAW10 @ ~60 fps)
-- [x] Device-tree user overlay generator for sensor0 (`overlay/make_overlay.sh`)
-- [ ] Read chip ID 0x9281 on hardware
-- [ ] First frame (mono RAW10, 1280x800)
+- [x] `ov9281_mipi.c` v0.1 (chip-ID detect + 1280x800 RAW10 @ ~60 fps)
+- [x] Device-tree user overlay for sensor0 (`overlay/make_overlay.sh`)
+- [x] Chip ID 0x9281 read on hardware (CAM1)
+- [x] First frames captured (mono RAW10, 1280x800)
+- [ ] Exposure / gain control from user space
 - [ ] sensor1 / CAM2
-- [ ] Two cameras streaming, hardware-synchronised (FSIN)
+- [ ] Two cameras streaming, hardware-synchronised (external trigger)
 
 ## Platform
 | Item | Value |
@@ -23,66 +31,107 @@ driver, so this folder ports one into Allwinner's VIN camera framework.
 | Kernel | `6.6.98-sun60iw2` (vendor BSP) |
 | Camera framework | Allwinner VIN (`vin_io.ko`, `vin_v4l2.ko`) |
 | Vendor source | [`orangepi-xunlong/linux-orangepi`](https://github.com/orangepi-xunlong/linux-orangepi), branch `orange-pi-6.6-sun60iw2` |
+| Camera | Innomaker CAM-OV9281RAW V2 (OV9281, 118° H FoV, external trigger) |
+| Cable | 15-pin (1.0 mm) to 22-pin (0.5 mm) Pi Zero / Pi 5 camera FPC |
 
-## Findings
-- The board's DTB (`sun60i-a733-orangepi-zero3w.dtb`) already contains the full
-  camera graph: `vind`, 3x `csi`, 3x `mipi`, `isp`, `tdm`, `sensor`, `vinc`.
-- `sensor0` is preset to `imx219` (CCI bus 0x0b, 8-bit addr 0x20, MCLK 1,
-  pwdn PE6, status okay). `sensor1` is preset to `ov13850_mipi` (disabled).
-- Loading VIN probes IMX219 on both CSI ports. With nothing connected:
-  ```
-  sunxi:vin:[INFO]: [VIN_DEV_I2C]imx219 read retry 3, read addr is 0x0
-  sunxi:vin:[ERR]: [imx219]chip found is not an target chip.
-  sunxi:vin:[ERR]: registering imx219_2, No such device!
-  ```
-  i.e. the pipeline is alive and waiting for a sensor.
-- Shipped sensor modules: only `imx219.ko` and `ov13850_mipi.ko`.
-- Building out-of-tree needs Allwinner's own headers from `bsp/include`
-  (e.g. `sunxi-log.h`), which the headers package does not include. The
-  `Kbuild` here adds that include path and builds only the drivers we need.
-
-## Bring-up steps (on the board)
+## Quick start (on the board)
 ```bash
 ./setup.sh                    # build imx219.ko (reference) + ov9281_mipi.ko
 ./overlay/make_overlay.sh     # sensor0 -> ov9281_mipi, addr 0xc0, ISP bypass
 sudo reboot
 ./test.sh                     # reload VIN with the driver, print dmesg
+./capture.sh 5 frames         # grab 5 frames -> frames.raw + frames_N.png
 ```
-Success looks like `[ov9281] found OV9281, chip id 0x9281`.
+Expected from `test.sh`:
+```
+sunxi:vin:[INFO]: [ov9281_mipi][ov9281] found OV9281, chip id 0x9281
+```
 
-Grab frames (pick the VIN capture node from `v4l2-ctl --list-devices`):
+## Wiring (read this first)
+A reversed cable shorts 3.3 V to GND and can burn the cable and camera.
+
+- **Board end (22-pin, CAM1):** connector side of the Zero 3W facing up,
+  **gold contacts facing up** (away from the board), stiffener towards the board.
+- **Camera end (15-pin):** gold contacts face the **camera PCB**. With a cable
+  whose contacts are on the same face at both ends, lay it flat without a
+  twist: the Innomaker module (connector on the back) then sits **connector
+  side down, lens up**.
+- Push both ends fully in; insulate any exposed contacts (Kapton) and keep the
+  cable away from the 40-pin header solder joints.
+- Check before powering (multimeter, continuity): header pin 6 (GND) to camera
+  connector pin 1 must beep, to pin 15 (3.3 V) must not.
+- CAM1 = `sensor0`: CCI bus i2c-11 (PE7/PE8), MCLK1, PE6. CAM2 = `sensor1`: i2c-9.
+- The Innomaker module's J1 matches the Raspberry Pi camera pinout, but pins
+  11/12 are not connected: there is no enable pin, it powers up as soon as
+  pin 15 has 3.3 V. The module carries its own oscillator (X1).
+
+## Capturing
+- VIN attaches the sensor to the pipeline only after `VIDIOC_S_INPUT`, and only
+  for that open file handle. Input, format and streaming must therefore be one
+  `v4l2-ctl` call with `-i 0`; without it `S_FMT` fails with `EINVAL` and a
+  `vin_pipeline_try_format` warning in dmesg.
+- With the ISP bypassed (`sensor0_isp_used = 0`) only RAW formats work; use
+  `BG10`. NV12/GREY need the Bayer ISP.
+- `VIDIOC_CREATE_BUFS returned -1` is harmless; v4l2-ctl falls back to REQBUFS.
+- Frames are 1280x800 x 16-bit little-endian words (2 048 000 bytes each).
+  `raw2png.py` converts them (`--rotate`, `--linear` options).
+
 ```bash
-v4l2-ctl -d /dev/videoN --set-fmt-video=width=1280,height=800,pixelformat=BG10 \
-  --stream-mmap --stream-count=5 --stream-to=frames.raw
+v4l2-ctl -d /dev/video0 -i 0 \
+  --set-fmt-video=width=1280,height=800,pixelformat=BG10 \
+  --stream-mmap --stream-skip=10 --stream-count=5 --stream-to=frames.raw
 python3 raw2png.py frames.raw
 ```
 
-### Driver notes
+## Driver notes
 - VIN has no Y10 media-bus path, so the mono RAW10 stream is reported as
-  `SBGGR10_1X10`; the bytes are plain grey values.
+  `SBGGR10_1X10`; the data are plain grey values.
 - One mode: 1280x800, 2 lanes @ 800 Mbps, HTS 1456, VTS 1822, ~60 fps.
-- Exposure/gain use VIN's Q4 convention (16 = 1 line / 1.0x).
+- Register tables come from mainline `drivers/media/i2c/ov9282.c`.
+- Exposure/gain use VIN's Q4 convention (16 = 1 line / 1.0x). Default:
+  642 lines (~5.8 ms), gain 1.0x. No auto exposure without the ISP, which is
+  what VIO wants anyway (fixed, short exposure).
+- `vin_io`'s `sensor_write_array()` may read one entry past an array while
+  batching consecutive registers, so every table ends with a `REG_DLY, 0`
+  sentinel.
+- Debug parameter: `insmod ov9281_mipi.ko keep_power=1` leaves the sensor
+  powered after probe so the bus and rails can be inspected
+  (`i2cdetect -y -r 11`, multimeter on the camera connector).
 
-## Build only (on the board)
-```bash
-./setup.sh                 # headers, sparse vendor source, build
-sudo rmmod vin_v4l2        # VIN only probes sensors when it loads
-sudo insmod build/<driver>.ko
-sudo modprobe vin_v4l2
-sudo dmesg | grep -iE 'imx219|ov9281'
-```
-`loading out-of-tree module taints kernel` is expected.
+## Debug log (what went wrong on the way)
+1. `S_FMT` EINVAL: missing `VIDIOC_S_INPUT` (see Capturing).
+2. No I2C ACK at 0x60 on every bus: cable inserted with the wrong face at one
+   end. An earlier reversed insertion shorted 3.3 V and burned the first cable
+   (the camera survived).
+3. `make_overlay.sh` found nothing: `/proc/device-tree` is a symlink, so
+   `find` needs a trailing slash.
+4. A public report claims the A733 MIPI receiver never decodes packets on this
+   board; that was not reproduced here.
 
-## Porting plan (IMX219 -> OV9281)
-| Field | IMX219 | OV9281 |
+## Device tree
+`overlay/make_overlay.sh` builds a user overlay for the live node
+`/soc@3000000/vind@5800800/sensor@5812000`, installs it in
+`/boot/overlay-user/`, and adds it to `user_overlays=` in
+`/boot/orangepiEnv.txt`. To undo it, remove that entry (from the UART console
+or with the SD card in another computer) and reboot.
+
+| Property | Vendor default | OV9281 |
 |---|---|---|
-| `SENSOR_NAME` | `imx219` | `ov9281_mipi` |
-| `V4L2_IDENT_SENSOR` | `0x0219` | `0x9281` |
-| `I2C_ADDR` (8-bit) | `0x20` | `0xc0` (7-bit 0x60) |
-| Chip-ID register | `0x0000` | `0x300A` / `0x300B` |
-| Media-bus format | `SRGGB10_1X10` | `Y10_1X10` (mono) |
-| Register tables | IMX219 | from mainline `drivers/media/i2c/ov9282.c` |
-| DT `sensor0_isp_used` | 1 | 0 (mono RAW, bypass Bayer ISP) |
+| `sensor0_mname` | `imx219` | `ov9281_mipi` |
+| `sensor0_twi_addr` (8-bit) | `0x20` | `0xc0` (7-bit 0x60) |
+| `sensor0_isp_used` | 1 | 0 (mono RAW, bypass Bayer ISP) |
+
+## Build only
+```bash
+./setup.sh                 # headers, sparse vendor source, build into build/
+sudo rmmod vin_v4l2        # VIN only probes sensors when it loads
+sudo modprobe vin_io
+sudo insmod build/ov9281_mipi.ko
+sudo modprobe vin_v4l2
+```
+`loading out-of-tree module taints kernel` is expected. Building needs
+Allwinner's own headers from `bsp/include` (e.g. `sunxi-log.h`), which the
+headers package lacks; `Kbuild` adds that path.
 
 ## License
 Everything in this folder is GPL-2.0, because the driver is derived from the

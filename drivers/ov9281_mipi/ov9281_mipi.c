@@ -74,6 +74,11 @@ MODULE_LICENSE("GPL");
 
 static int ov9281_vts = OV9281_VTS;
 
+/* Debug: leave the sensor powered after probe so the bus can be inspected */
+static int keep_power;
+module_param(keep_power, int, 0644);
+MODULE_PARM_DESC(keep_power, "1 = skip PWR_OFF (debug: i2cdetect / measure rails)");
+
 /*
  * sensor_write_array() batches consecutive register addresses and can read
  * one element past the end of an array while doing so. Every table ends
@@ -307,7 +312,7 @@ static int sensor_power(struct v4l2_subdev *sd, int on)
 		vin_gpio_write(sd, RESET, CSI_GPIO_HIGH);
 		break;
 	case PWR_ON:
-		sensor_dbg("PWR_ON!\n");
+		sensor_print("[ov9281] PWR_ON\n");
 		cci_lock(sd);
 		vin_gpio_set_status(sd, PWDN, 1);
 		vin_gpio_set_status(sd, RESET, 1);
@@ -328,6 +333,10 @@ static int sensor_power(struct v4l2_subdev *sd, int on)
 		cci_unlock(sd);
 		break;
 	case PWR_OFF:
+		if (keep_power) {
+			sensor_print("[ov9281] keep_power=1: leaving sensor powered\n");
+			break;
+		}
 		sensor_dbg("PWR_OFF!\n");
 		cci_lock(sd);
 		vin_set_mclk(sd, OFF);

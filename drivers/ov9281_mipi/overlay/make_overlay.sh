@@ -43,4 +43,4 @@ else
   echo "user_overlays=$NAME" | sudo tee -a "$ENV" >/dev/null
 fi
 echo "--- $ENV ---"; grep -E '^(overlays|user_overlays)=' "$ENV"
-echo "Installed. Reboot, then run ../test.sh"
+echo "Installed. Reboot, then run ./test.sh"

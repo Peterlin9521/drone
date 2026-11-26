@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-2.0
+# Grab RAW10 frames from the OV9281 through Allwinner VIN and convert to PNG.
+#   ./capture.sh [count] [name]      e.g. ./capture.sh 5 frames
+# Env: DEV=/dev/videoN (default: first sunxi-vin capture node)
+set -euo pipefail
+COUNT=${1:-1}
+NAME=${2:-shot}
+HERE=$(cd "$(dirname "$0")" && pwd)
+
+if [ -z "${DEV:-}" ]; then
+  DEV=$(v4l2-ctl --list-devices 2>/dev/null | awk '/sunxi-vin/{f=1;next} f&&/\/dev\/video/{print $1; exit}')
+fi
+[ -n "$DEV" ] || { echo "no sunxi-vin video node; run ./test.sh first"; exit 1; }
+echo "device: $DEV"
+
+# VIN only attaches the sensor to the pipeline after VIDIOC_S_INPUT, and only
+# for the open file handle, so input, format and streaming must be one call.
+# With the ISP bypassed only RAW formats work (BG10 = our mono RAW10).
+v4l2-ctl -d "$DEV" -i 0 \
+  --set-fmt-video=width=1280,height=800,pixelformat=BG10 \
+  --stream-mmap --stream-skip=10 --stream-count="$COUNT" \
+  --stream-to="$NAME.raw"
+# "VIDIOC_CREATE_BUFS returned -1" is harmless: v4l2-ctl falls back to REQBUFS.
+
+python3 "$HERE/raw2png.py" "$NAME.raw"

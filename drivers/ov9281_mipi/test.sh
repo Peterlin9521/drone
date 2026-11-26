@@ -7,7 +7,7 @@ KO="$HERE/build/ov9281_mipi.ko"
 [ -f "$KO" ] || { echo "build first: ./setup.sh"; exit 1; }
 
 echo "== live DT sensor0 =="
-N=$(find /proc/device-tree -type d -name 'sensor@5812000' | head -1)
+N=$(find /proc/device-tree/ -type d -name 'sensor@5812000' | head -1)
 for p in mname twi_addr isp_used; do
   printf '%-10s ' "$p"
   if [ "$p" = mname ]; then tr -d '\0' < "$N/sensor0_$p"; echo

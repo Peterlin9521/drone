@@ -10,7 +10,7 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 NAME=ov9281-sensor0
 
 # Find the live path of sensor0 (sensor@5812000) in the running device tree
-NODE=$(find /proc/device-tree -type d -name 'sensor@5812000' | head -1)
+NODE=$(find /proc/device-tree/ -type d -name 'sensor@5812000' | head -1)
 [ -n "$NODE" ] || { echo "sensor@5812000 not found in /proc/device-tree"; exit 1; }
 DTPATH=${NODE#/proc/device-tree}
 echo "sensor0 node: $DTPATH"

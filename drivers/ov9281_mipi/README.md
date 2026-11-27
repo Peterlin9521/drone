@@ -21,7 +21,7 @@ bypassed, contrast-stretched. The blurred hand is motion blur during the
 - [x] First frames captured (mono RAW10, 1280x800)
 - [x] Tools: `capture.sh` (auto-finds /dev/videoN) + contrast-stretched PNG
 - [ ] Exposure / gain control from user space (next: `v4l2-ctl -d /dev/video0 -l`)
-- [ ] sensor1 / CAM2 (overlay + scripts ready, not yet tested)
+- [ ] CAM2 = `sensor2` node (overlay + scripts ready, not yet tested)
 - [ ] Two cameras streaming, hardware-synchronised (external trigger)
 
 ## Platform
@@ -41,7 +41,7 @@ source ~/drone-env/bin/activate   # Python venv (see "Python environment")
 pip install -r requirements.txt   # numpy + pillow for raw2png.py
 ./setup.sh                    # build imx219.ko (reference) + ov9281_mipi.ko
 ./overlay/make_overlay.sh     # sensor0/1 -> ov9281_mipi(_2), addr 0xc0, ISP bypass
-                              # (./overlay/make_overlay.sh 0 = CAM1 only)
+                              # (./overlay/make_overlay.sh 1 = CAM1 only)
 sudo reboot
 ./test.sh                     # reload VIN with the driver, print dmesg
 ./capture.sh 5 frames         # CAM1: 5 frames -> frames.raw + frames_N.png
@@ -65,7 +65,7 @@ A reversed cable shorts 3.3 V to GND and can burn the cable and camera.
   cable away from the 40-pin header solder joints.
 - Check before powering (multimeter, continuity): header pin 6 (GND) to camera
   connector pin 1 must beep, to pin 15 (3.3 V) must not.
-- CAM1 = `sensor0`: CCI bus i2c-11 (PE7/PE8), MCLK1, PE6. CAM2 = `sensor1`: i2c-9.
+- CAM1 = `sensor0`: CCI bus i2c-11 (PE7/PE8), MCLK1, PE6. CAM2 = `sensor2` (DT node `sensor@5812020`).
 - The Innomaker module's J1 matches the Raspberry Pi camera pinout, but pins
   11/12 are not connected: there is no enable pin, it powers up as soon as
   pin 15 has 3.3 V. The module carries its own oscillator (X1).
@@ -131,12 +131,12 @@ system package `v4l-utils`.
 
 ## Device tree
 `overlay/make_overlay.sh` builds one user overlay (`ov9281-sensors`) for the
-live sensor nodes (found by their `sensorN_mname` property; sensor0 is
-`/soc@3000000/vind@5800800/sensor@5812000`), installs it in
+enabled sensor nodes: CAM1 = `sensor@5812000` (`sensor0`), CAM2 =
+`sensor@5812020` (`sensor2`; `sensor@5812010`/`sensor1` is disabled), installs it in
 `/boot/overlay-user/`, and adds it to `user_overlays=` in
 `/boot/orangepiEnv.txt`, replacing the older single-camera `ov9281-sensor0`.
 The driver registers two names, `ov9281_mipi` (sensor0) and `ov9281_mipi_2`
-(sensor1), like the vendor `imx219` / `imx219_2`. To undo it, remove that entry (from the UART console
+(CAM2), like the vendor `imx219` / `imx219_2`. To undo it, remove that entry (from the UART console
 or with the SD card in another computer) and reboot.
 
 | Property | Vendor default | OV9281 |
@@ -144,8 +144,8 @@ or with the SD card in another computer) and reboot.
 | `sensor0_mname` | `imx219` | `ov9281_mipi` |
 | `sensor0_twi_addr` (8-bit) | `0x20` | `0xc0` (7-bit 0x60) |
 | `sensor0_isp_used` | 1 | 0 (mono RAW, bypass Bayer ISP) |
-| `sensor1_mname` | `imx219_2` | `ov9281_mipi_2` |
-| `sensor1_twi_addr` / `isp_used` | | `0xc0` / 0 |
+| `sensor2_mname` (CAM2) | `imx219_2` | `ov9281_mipi_2` |
+| `sensor2_twi_addr` / `isp_used` | | `0xc0` / 0 |
 
 ## Build only
 ```bash

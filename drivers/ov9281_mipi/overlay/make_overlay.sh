@@ -2,42 +2,49 @@
 # SPDX-License-Identifier: GPL-2.0
 # Build one device-tree user overlay that switches both CSI sensors from
 # IMX219 to OV9281 and install it for the Orange Pi boot script.
-#   sensorN_mname    = "ov9281_mipi" (CAM1) / "ov9281_mipi_2" (CAM2)
-#   sensorN_twi_addr = 0xc0           (8-bit form of 7-bit 0x60)
-#   sensorN_isp_used = 0              (mono RAW: bypass the Bayer ISP)
+#
+# Only enabled (status = okay) sensor nodes count. On the Zero 3W these are
+#   CAM1 = sensor@5812000, device_type "sensor0"  -> "ov9281_mipi"
+#   CAM2 = sensor@5812020, device_type "sensor2"  -> "ov9281_mipi_2"
+# (sensor@5812010 / "sensor1" exists but is disabled.)
+# For each: sensorN_mname, sensorN_twi_addr = 0xc0 (8-bit form of 0x60),
+#           sensorN_isp_used = 0 (mono RAW: bypass the Bayer ISP)
+#
 # Usage: ./make_overlay.sh        both cameras
-#        ./make_overlay.sh 0      CAM1 only
+#        ./make_overlay.sh 1      CAM1 only
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 NAME=ov9281-sensors
 OLD=ov9281-sensor0              # earlier single-camera overlay
-IDS=${1:-"0 1"}
+NCAM=${1:-2}
 
-{
-  echo "/dts-v1/;"
-  echo "/plugin/;"
-  echo "/ {"
-} > "$HERE/$NAME.dts"
+printf '/dts-v1/;\n/plugin/;\n/ {\n' > "$HERE/$NAME.dts"
 
-for i in $IDS; do
-  [ "$i" = 0 ] && MNAME=ov9281_mipi || MNAME=ov9281_mipi_2
-  # The sensor node is the one that carries sensorN_mname
-  PROP=$(find /proc/device-tree/ -name "sensor${i}_mname" | head -1)
-  [ -n "$PROP" ] || { echo "sensor${i}_mname not found in /proc/device-tree"; exit 1; }
-  NODE=$(dirname "$PROP")
+# Enabled sensor nodes, ordered by their sensorN number
+NODES=$(for n in $(find /proc/device-tree/ -type d -name 'sensor@*'); do
+          [ "$(tr -d '\0' < "$n/status" 2>/dev/null)" = okay ] || continue
+          t=$(tr -d '\0' < "$n/device_type")
+          echo "${t#sensor} $n"
+        done | sort -n | head -"$NCAM")
+[ -n "$NODES" ] || { echo "no enabled sensor nodes in /proc/device-tree"; exit 1; }
+
+k=0
+while read -r N NODE; do
+  [ "$k" = 0 ] && MNAME=ov9281_mipi || MNAME=ov9281_mipi_2
   DTPATH=${NODE#/proc/device-tree}
-  echo "sensor$i node: $DTPATH  (current mname: $(tr -d '\0' < "$PROP") -> $MNAME)"
+  echo "CAM$((k+1)): $DTPATH  sensor$N  $(tr -d '\0' < "$NODE/sensor${N}_mname") -> $MNAME"
   cat >> "$HERE/$NAME.dts" <<DTS
-	fragment@$i {
+	fragment@$k {
 		target-path = "$DTPATH";
 		__overlay__ {
-			sensor${i}_mname = "$MNAME";
-			sensor${i}_twi_addr = <0xc0>;
-			sensor${i}_isp_used = <0x00>;
+			sensor${N}_mname = "$MNAME";
+			sensor${N}_twi_addr = <0xc0>;
+			sensor${N}_isp_used = <0x00>;
 		};
 	};
 DTS
-done
+  k=$((k+1))
+done <<< "$NODES"
 echo "};" >> "$HERE/$NAME.dts"
 
 dtc -@ -I dts -O dtb -o "$HERE/$NAME.dtbo" "$HERE/$NAME.dts"

@@ -6,12 +6,11 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 KO="$HERE/build/ov9281_mipi.ko"
 [ -f "$KO" ] || { echo "build first: ./setup.sh"; exit 1; }
 
-echo "== live DT sensors =="
-for i in 0 1; do
-  P=$(find /proc/device-tree/ -name "sensor${i}_mname" | head -1)
-  [ -n "$P" ] || { echo "sensor$i: not in DT"; continue; }
-  N=$(dirname "$P")
-  printf 'sensor%s  mname=%s' "$i" "$(tr -d '\0' < "$P")"
+echo "== live DT sensors (enabled only) =="
+for N in $(find /proc/device-tree/ -type d -name 'sensor@*' | sort); do
+  [ "$(tr -d '\0' < "$N/status" 2>/dev/null)" = okay ] || continue
+  i=$(tr -d '\0' < "$N/device_type"); i=${i#sensor}
+  printf 'sensor%s  mname=%s' "$i" "$(tr -d '\0' < "$N/sensor${i}_mname")"
   for p in twi_addr isp_used; do
     printf '  %s=%s' "$p" "$(od -An -tx1 "$N/sensor${i}_$p" 2>/dev/null | tr -d ' \n')"
   done

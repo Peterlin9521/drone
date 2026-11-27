@@ -128,6 +128,9 @@ system package `v4l-utils`.
   sentinel.
 - v0.2: the mode table carries a default exposure, so the driver re-applies
   the user's exposure/gain after it at stream on (v0.1 lost `-c exposure=`).
+- v0.3: the exposure control is VOLATILE (reads come from the sensor); the
+  control framework never calls `s_ctrl` for a volatile control unless it is
+  also EXECUTE_ON_WRITE, so `-c exposure=` was dropped while `gain` worked.
   Start-up values: `insmod ov9281_mipi.ko exposure=N gain=G`.
 - Debug parameter: `insmod ov9281_mipi.ko keep_power=1` leaves the sensor
   powered after probe so the bus and rails can be inspected

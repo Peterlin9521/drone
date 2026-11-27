@@ -662,8 +662,12 @@ static int sensor_init_controls(struct v4l2_subdev *sd,
 	ctrl = v4l2_ctrl_new_std(handler, ops, V4L2_CID_EXPOSURE, 16,
 				 (OV9281_VTS - OV9281_EXP_MARGIN) << 4, 1,
 				 642 << 4);
+	/* VOLATILE alone makes the control framework skip s_ctrl (volatile
+	 * controls never count as changed), so writes were silently dropped
+	 * in v0.1/v0.2. EXECUTE_ON_WRITE makes every write reach the sensor. */
 	if (ctrl)
-		ctrl->flags |= V4L2_CTRL_FLAG_VOLATILE;
+		ctrl->flags |= V4L2_CTRL_FLAG_VOLATILE |
+			       V4L2_CTRL_FLAG_EXECUTE_ON_WRITE;
 	v4l2_ctrl_new_std(handler, ops, V4L2_CID_GAIN, OV9281_GAIN_MIN,
 			  OV9281_GAIN_MAX, 1, OV9281_GAIN_MIN);
 

@@ -27,5 +27,13 @@ sudo modprobe vin_v4l2
 sleep 1
 sudo dmesg | grep -iE 'ov9281|sensor|vinc|register|cci' | head -40
 
+# Let udev finish probing the new nodes, then attach each sensor once
+# (S_INPUT) so a later VIDIOC_S_CTRL cannot hit VIN's NULL-sensor Oops.
+sudo udevadm settle
+for d in $(v4l2-ctl --list-devices 2>/dev/null |
+           awk '/sunxi-vin/{f=1;next} /^[^ \t]/{f=0} f&&/\/dev\/video/{print $1}'); do
+  v4l2-ctl -d "$d" -i 0 >/dev/null && echo "attached sensor on $d"
+done
+
 echo "== video devices =="
 v4l2-ctl --list-devices 2>/dev/null || ls /dev/video*

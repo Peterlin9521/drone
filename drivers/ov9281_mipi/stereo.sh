@@ -14,6 +14,11 @@ mapfile -t DEVS < <(v4l2-ctl --list-devices 2>/dev/null |
   awk '/sunxi-vin/{f=1;next} /^[^ \t]/{f=0} f&&/\/dev\/video/{print $1}')
 [ "${#DEVS[@]}" -ge 2 ] || { echo "need two sunxi-vin video nodes; run ./test.sh"; exit 1; }
 C="exposure=${EXP:-10272},gain=${GAIN:-16}"
+# Attach each sensor before any -c (see capture.sh: VIN Oops otherwise)
+for d in "${DEVS[@]:0:2}"; do
+  if fuser -s "$d" 2>/dev/null; then echo "$d is busy"; exit 1; fi
+  v4l2-ctl -d "$d" -i 0 >/dev/null || exit 1
+done
 echo "left ${DEVS[0]}  right ${DEVS[1]}  controls: $C  frames: $COUNT"
 
 grab() {   # dev side

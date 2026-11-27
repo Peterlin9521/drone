@@ -88,6 +88,8 @@ A reversed cable shorts 3.3 V to GND and can burn the cable and camera.
   x16 (16 = 1x, max 255; VIN shows a generic max of 96000, the driver clamps).
   VIN's ISP controls (auto exposure, white balance, ...) do nothing with the
   ISP bypassed.
+- **Never set controls on a freshly loaded VIN before `-i 0`** (kernel Oops,
+  see debug log 5). `./test.sh` and the scripts handle this.
 - A VIN video node can only be open once: a second `v4l2-ctl` during
   streaming gets `Device or resource busy`. Runtime changes must come from the
   process that streams.
@@ -150,6 +152,18 @@ system package `v4l-utils`.
    `find` needs a trailing slash.
 4. A public report claims the A733 MIPI receiver never decodes packets on this
    board; that was not reproduced here.
+5. Board rebooted a few seconds into `live.sh`/`focus.sh` (2026-11-27). Kernel
+   Oops (NULL pointer at 0xb0) in `vin_s_ctrl` [vin_v4l2], from
+   `VIDIOC_S_CTRL` (x1 = 0x980911 = EXPOSURE). Cause: VIN's `vin_s_ctrl` uses
+   `cap->pipe.sd[VIN_IND_SENSOR]`, which is NULL until `VIDIOC_S_INPUT`, and
+   `v4l2-ctl` applies `-c` before `-i`. The first `-c` after a VIN reload
+   therefore crashes the kernel. Fix (scripts): `test.sh` waits for udev and
+   attaches each sensor with `v4l2-ctl -i 0`; every capture script does the
+   same in a separate call before setting controls. To see a full Oops instead
+   of an instant reboot: `sudo sysctl -w kernel.panic_on_oops=0`.
+   Not the cause (ruled out by tests): power on the drone BEC, temperature
+   (max 69 C under 8-core load + streaming), Wi-Fi. A PC USB port *is* too
+   weak for the board (an earlier, separate brown-out).
 
 ## Device tree
 `overlay/make_overlay.sh` builds one user overlay (`ov9281-sensors`) for the

@@ -49,6 +49,7 @@ sudo reboot
 ./capture.sh 5 frames         # CAM1: 5 frames -> frames.raw + frames_N.png
 CAM=1 ./capture.sh 1 right    # CAM2 (/dev/video8: VIN pipe vinc8)
 EXP=28000 GAIN=32 ./capture.sh 1 bright   # longer exposure, 2x gain
+./live.sh                     # live view in the PC browser: http://<Pi IP>:8080
 ./focus.sh                    # live sharpness meter for focusing (CAM=1 for CAM2)
 ./stereo.sh 300               # both cameras at once + timestamp offset report
 ```

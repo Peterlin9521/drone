@@ -21,6 +21,9 @@ bypassed, contrast-stretched. The blurred hand is motion blur during the
 - [x] First frames captured (mono RAW10, 1280x800)
 - [x] Tools: `capture.sh` (auto-finds /dev/videoN) + contrast-stretched PNG
 - [x] Exposure / gain through V4L2 controls (driver v0.3, `EXP=`/`GAIN=`)
+- [x] Kernel Oops on first `-c` after VIN reload fixed in the scripts (verified:
+      `focus.sh` 2 min stable, 2026-11-27)
+- [x] Browser live view (`live.sh`)
 - [ ] Lens focus locked (`focus.sh` live sharpness meter)
 - [ ] Both cameras streaming together, timestamp offset measured (`stereo.sh`)
 - [x] CAM2 (`sensor2` node): both cameras detected and streaming (2026-11-27)

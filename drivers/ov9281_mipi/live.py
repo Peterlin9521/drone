@@ -7,6 +7,7 @@ Open http://<Pi IP>:8080 on the PC. The picture is shown at half size
 (the green box) drawn on top. Use with live.sh.
 """
 import io
+import os
 import sys
 import threading
 import time
@@ -93,3 +94,8 @@ try:
     srv.serve_forever()
 except KeyboardInterrupt:
     pass
+# The reader thread may be blocked in stdin.read(); a normal interpreter
+# shutdown then aborts with 'could not acquire lock for <stdin>'. Exit hard.
+print()
+sys.stdout.flush()
+os._exit(0)

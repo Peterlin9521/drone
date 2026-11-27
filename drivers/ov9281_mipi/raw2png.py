@@ -3,7 +3,7 @@
 """Convert OV9281 RAW10 frames (16-bit little-endian words) to PNG.
 
 usage: raw2png.py frames.raw [--width 1280] [--height 800]
-                             [--rotate 0|90|180|270] [--linear]
+                             [--rotate 0|90|180|270] [--linear] [--first N]
 
 By default each frame is contrast-stretched (1st..99.5th percentile) so
 dark indoor shots are visible; --linear keeps the plain 10->8 bit scale.
@@ -18,11 +18,14 @@ ap.add_argument("--width", type=int, default=1280)
 ap.add_argument("--height", type=int, default=800)
 ap.add_argument("--rotate", type=int, default=0, choices=[0, 90, 180, 270])
 ap.add_argument("--linear", action="store_true")
+ap.add_argument("--first", type=int, default=0, help="convert only the first N frames")
 a = ap.parse_args()
 
 w, h = a.width, a.height
 data = np.fromfile(a.raw, dtype="<u2")
 n = data.size // (w * h)
+if a.first:
+    n = min(n, a.first)
 if n == 0:
     raise SystemExit(f"file too small for {w}x{h}: {data.size} pixels")
 

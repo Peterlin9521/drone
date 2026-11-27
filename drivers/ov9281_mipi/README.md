@@ -20,7 +20,9 @@ bypassed, contrast-stretched. The blurred hand is motion blur during the
 - [x] Chip ID 0x9281 read on hardware (CAM1)
 - [x] First frames captured (mono RAW10, 1280x800)
 - [x] Tools: `capture.sh` (auto-finds /dev/videoN) + contrast-stretched PNG
-- [ ] Exposure / gain through V4L2 controls (driver v0.2 + `EXP=`/`GAIN=`, to verify)
+- [x] Exposure / gain through V4L2 controls (driver v0.3, `EXP=`/`GAIN=`)
+- [ ] Lens focus locked (`focus.sh` live sharpness meter)
+- [ ] Both cameras streaming together, timestamp offset measured (`stereo.sh`)
 - [x] CAM2 (`sensor2` node): both cameras detected and streaming (2026-11-27)
 - [ ] Two cameras streaming, hardware-synchronised (external trigger)
 
@@ -47,6 +49,8 @@ sudo reboot
 ./capture.sh 5 frames         # CAM1: 5 frames -> frames.raw + frames_N.png
 CAM=1 ./capture.sh 1 right    # CAM2 (/dev/video8: VIN pipe vinc8)
 EXP=28000 GAIN=32 ./capture.sh 1 bright   # longer exposure, 2x gain
+./focus.sh                    # live sharpness meter for focusing (CAM=1 for CAM2)
+./stereo.sh 300               # both cameras at once + timestamp offset report
 ```
 Expected from `test.sh`:
 ```

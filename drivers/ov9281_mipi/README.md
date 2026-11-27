@@ -21,7 +21,7 @@ bypassed, contrast-stretched. The blurred hand is motion blur during the
 - [x] First frames captured (mono RAW10, 1280x800)
 - [x] Tools: `capture.sh` (auto-finds /dev/videoN) + contrast-stretched PNG
 - [ ] Exposure / gain control from user space (next: `v4l2-ctl -d /dev/video0 -l`)
-- [ ] sensor1 / CAM2
+- [ ] sensor1 / CAM2 (overlay + scripts ready, not yet tested)
 - [ ] Two cameras streaming, hardware-synchronised (external trigger)
 
 ## Platform
@@ -40,10 +40,12 @@ bypassed, contrast-stretched. The blurred hand is motion blur during the
 source ~/drone-env/bin/activate   # Python venv (see "Python environment")
 pip install -r requirements.txt   # numpy + pillow for raw2png.py
 ./setup.sh                    # build imx219.ko (reference) + ov9281_mipi.ko
-./overlay/make_overlay.sh     # sensor0 -> ov9281_mipi, addr 0xc0, ISP bypass
+./overlay/make_overlay.sh     # sensor0/1 -> ov9281_mipi(_2), addr 0xc0, ISP bypass
+                              # (./overlay/make_overlay.sh 0 = CAM1 only)
 sudo reboot
 ./test.sh                     # reload VIN with the driver, print dmesg
-./capture.sh 5 frames         # grab 5 frames -> frames.raw + frames_N.png
+./capture.sh 5 frames         # CAM1: 5 frames -> frames.raw + frames_N.png
+CAM=1 ./capture.sh 1 right    # CAM2 (second sunxi-vin node)
 ```
 Expected from `test.sh`:
 ```
@@ -128,10 +130,13 @@ system package `v4l-utils`.
    board; that was not reproduced here.
 
 ## Device tree
-`overlay/make_overlay.sh` builds a user overlay for the live node
-`/soc@3000000/vind@5800800/sensor@5812000`, installs it in
+`overlay/make_overlay.sh` builds one user overlay (`ov9281-sensors`) for the
+live sensor nodes (found by their `sensorN_mname` property; sensor0 is
+`/soc@3000000/vind@5800800/sensor@5812000`), installs it in
 `/boot/overlay-user/`, and adds it to `user_overlays=` in
-`/boot/orangepiEnv.txt`. To undo it, remove that entry (from the UART console
+`/boot/orangepiEnv.txt`, replacing the older single-camera `ov9281-sensor0`.
+The driver registers two names, `ov9281_mipi` (sensor0) and `ov9281_mipi_2`
+(sensor1), like the vendor `imx219` / `imx219_2`. To undo it, remove that entry (from the UART console
 or with the SD card in another computer) and reboot.
 
 | Property | Vendor default | OV9281 |
@@ -139,6 +144,8 @@ or with the SD card in another computer) and reboot.
 | `sensor0_mname` | `imx219` | `ov9281_mipi` |
 | `sensor0_twi_addr` (8-bit) | `0x20` | `0xc0` (7-bit 0x60) |
 | `sensor0_isp_used` | 1 | 0 (mono RAW, bypass Bayer ISP) |
+| `sensor1_mname` | `imx219_2` | `ov9281_mipi_2` |
+| `sensor1_twi_addr` / `isp_used` | | `0xc0` / 0 |
 
 ## Build only
 ```bash

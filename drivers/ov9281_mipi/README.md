@@ -20,8 +20,8 @@ bypassed, contrast-stretched. The blurred hand is motion blur during the
 - [x] Chip ID 0x9281 read on hardware (CAM1)
 - [x] First frames captured (mono RAW10, 1280x800)
 - [x] Tools: `capture.sh` (auto-finds /dev/videoN) + contrast-stretched PNG
-- [ ] Exposure / gain control from user space (next: `v4l2-ctl -d /dev/video0 -l`)
-- [ ] CAM2 = `sensor2` node (overlay + scripts ready, not yet tested)
+- [ ] Exposure / gain through V4L2 controls (driver v0.2 + `EXP=`/`GAIN=`, to verify)
+- [x] CAM2 (`sensor2` node): both cameras detected and streaming (2026-11-27)
 - [ ] Two cameras streaming, hardware-synchronised (external trigger)
 
 ## Platform
@@ -45,7 +45,8 @@ pip install -r requirements.txt   # numpy + pillow for raw2png.py
 sudo reboot
 ./test.sh                     # reload VIN with the driver, print dmesg
 ./capture.sh 5 frames         # CAM1: 5 frames -> frames.raw + frames_N.png
-CAM=1 ./capture.sh 1 right    # CAM2 (second sunxi-vin node)
+CAM=1 ./capture.sh 1 right    # CAM2 (/dev/video8: VIN pipe vinc8)
+EXP=28000 GAIN=32 ./capture.sh 1 bright   # longer exposure, 2x gain
 ```
 Expected from `test.sh`:
 ```
@@ -77,6 +78,16 @@ A reversed cable shorts 3.3 V to GND and can burn the cable and camera.
   `vin_pipeline_try_format` warning in dmesg.
 - With the ISP bypassed (`sensor0_isp_used = 0`) only RAW formats work; use
   `BG10`. NV12/GREY need the Bayer ISP.
+- Exposure/gain: `v4l2-ctl -c exposure=N,gain=G` in the **same** call. Units:
+  exposure = lines x16 (1 line = 9.1 us, max 28752 = ~16.3 ms at 60 fps), gain
+  x16 (16 = 1x, max 255; VIN shows a generic max of 96000, the driver clamps).
+  VIN's ISP controls (auto exposure, white balance, ...) do nothing with the
+  ISP bypassed.
+- A VIN video node can only be open once: a second `v4l2-ctl` during
+  streaming gets `Device or resource busy`. Runtime changes must come from the
+  process that streams.
+- Sensor registers can be read while streaming, e.g. exposure/gain:
+  `sudo i2ctransfer -f -y 11 w2@0x60 0x35 0x01 r1` (0x3501, 0x3502, 0x3509).
 - `VIDIOC_CREATE_BUFS returned -1` is harmless; v4l2-ctl falls back to REQBUFS.
 - Frames are 1280x800 x 16-bit little-endian words (2 048 000 bytes each).
   `raw2png.py` converts them (`--rotate`, `--linear` options).
@@ -115,6 +126,9 @@ system package `v4l-utils`.
 - `vin_io`'s `sensor_write_array()` may read one entry past an array while
   batching consecutive registers, so every table ends with a `REG_DLY, 0`
   sentinel.
+- v0.2: the mode table carries a default exposure, so the driver re-applies
+  the user's exposure/gain after it at stream on (v0.1 lost `-c exposure=`).
+  Start-up values: `insmod ov9281_mipi.ko exposure=N gain=G`.
 - Debug parameter: `insmod ov9281_mipi.ko keep_power=1` leaves the sensor
   powered after probe so the bus and rails can be inspected
   (`i2cdetect -y -r 11`, multimeter on the camera connector).

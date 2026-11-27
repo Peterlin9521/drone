@@ -79,6 +79,14 @@ static int keep_power;
 module_param(keep_power, int, 0644);
 MODULE_PARM_DESC(keep_power, "1 = skip PWR_OFF (debug: i2cdetect / measure rails)");
 
+/* Start-up exposure/gain, same units as the V4L2 controls (Q4: 16 = 1 line / 1.0x) */
+static int exposure = 642 << 4;
+module_param(exposure, int, 0644);
+MODULE_PARM_DESC(exposure, "start-up exposure, lines x16 (16..28752, default 10272 = ~5.8 ms)");
+static int gain = 0x10;
+module_param(gain, int, 0644);
+MODULE_PARM_DESC(gain, "start-up analog gain x16 (16 = 1.0x .. 255)");
+
 /*
  * sensor_write_array() batches consecutive register addresses and can read
  * one element past the end of an array while doing so. Every table ends
@@ -413,8 +421,12 @@ static int sensor_init(struct v4l2_subdev *sd, u32 val)
 	info->height = OV9281_HEIGHT;
 	info->hflip = 0;
 	info->vflip = 0;
-	info->gain = OV9281_GAIN_MIN;
-	info->exp = 642 << 4;
+	/* info is zeroed at probe: take the module defaults once, then keep
+	 * whatever user space set through the controls across re-opens */
+	if (!info->exp)
+		info->exp = clamp_exp(exposure);
+	if (!info->gain)
+		info->gain = clamp_gain(gain);
 	info->tpf.numerator = 1;
 	info->tpf.denominator = OV9281_FPS;
 	info->preview_first_flag = 1;
@@ -517,8 +529,15 @@ static int sensor_reg_init(struct sensor_info *info)
 	info->height = wsize->height;
 	ov9281_vts = wsize->vts;
 
-	sensor_print("[ov9281] streaming %ux%u RAW10 @ ~%d fps\n",
-		     wsize->width, wsize->height, OV9281_FPS);
+	/* The mode table writes a default exposure/gain; put back the values
+	 * set through V4L2 (or the module parameters) under group hold. */
+	sensor_write(sd, OV9281_REG_HOLD, 0x01);
+	sensor_write_exp(sd, clamp_exp(info->exp));
+	sensor_write(sd, OV9281_REG_AGAIN, clamp_gain(info->gain));
+	sensor_write(sd, OV9281_REG_HOLD, 0x00);
+
+	sensor_print("[ov9281] streaming %ux%u RAW10 @ ~%d fps, exp %u (Q4) gain %d\n",
+		     wsize->width, wsize->height, OV9281_FPS, info->exp, info->gain);
 	return 0;
 }
 

@@ -18,7 +18,7 @@ from PIL import Image, ImageDraw
 W, H = 1280, 800
 FRAME = W * H * 2
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
-FPS = 15                                     # browser update rate
+FPS = int(sys.argv[2]) if len(sys.argv) > 2 else 5   # browser update rate
 latest = b""
 cond = threading.Condition()
 
